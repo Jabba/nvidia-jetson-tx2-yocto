@@ -30,8 +30,8 @@ this branch, it's just what's currently checked out.
 
 ```
 cd sources
-git clone -b thud git://git.yoctoproject.org/poky.git
-git clone -b thud git://git.openembedded.org/meta-openembedded
+git clone -b thud https://git.yoctoproject.org/poky
+git clone -b thud https://git.openembedded.org/meta-openembedded
 git clone -b thud-l4t-r28.3 https://github.com/OE4T/meta-tegra.git
 ```
 
@@ -39,8 +39,8 @@ git clone -b thud-l4t-r28.3 https://github.com/OE4T/meta-tegra.git
 `LAYERSERIES_COMPAT_tegra = "thud"` declaration. `meta-tegra` needs `thud-l4t-r28.3` specifically —
 the branch containing `conf/machine/jetson-tx2.conf`.
 
-If the `git://` protocol is blocked on your network, use the `https://` mirrors instead:
-`https://git.yoctoproject.org/poky` and `https://git.openembedded.org/meta-openembedded`.
+Use `https://`, not `git://` — port 9418 (`git://`) is commonly blocked by firewalls/proxies and
+will hang instead of failing fast.
 
 `sources/` is gitignored — these checkouts are reproducible from the branches above and aren't
 committed.

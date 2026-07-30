@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yocto for Jetson TX2 — a Linux crash course</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --fg: #1a1d21;
+    --muted: #5b6470;
+    --card: #f5f6f8;
+    --border: #e0e3e8;
+    --code-bg: #282c34;
+    --code-fg: #e6e6e6;
+    --accent: #2b6cb0;
+    --accent-soft: #eaf2fb;
+    --warn-bg: #fff8e6;
+    --warn-border: #e8c766;
+    --good-bg: #eafaf0;
+    --good-border: #7fd3a0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --fg: #e7e9ec;
+      --muted: #9aa4b2;
+      --card: #1c1f24;
+      --border: #2c3038;
+      --code-bg: #0d0f12;
+      --code-fg: #d8dee9;
+      --accent: #6ea8e0;
+      --accent-soft: #1c2733;
+      --warn-bg: #2a2410;
+      --warn-border: #6b5a1e;
+      --good-bg: #10261a;
+      --good-border: #2e6b47;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #ffffff; --fg: #1a1d21; --muted: #5b6470; --card: #f5f6f8; --border: #e0e3e8;
+    --code-bg: #282c34; --code-fg: #e6e6e6; --accent: #2b6cb0; --accent-soft: #eaf2fb;
+    --warn-bg: #fff8e6; --warn-border: #e8c766; --good-bg: #eafaf0; --good-border: #7fd3a0;
+  }
+  :root[data-theme="dark"] {
+    --bg: #14161a; --fg: #e7e9ec; --muted: #9aa4b2; --card: #1c1f24; --border: #2c3038;
+    --code-bg: #0d0f12; --code-fg: #d8dee9; --accent: #6ea8e0; --accent-soft: #1c2733;
+    --warn-bg: #2a2410; --warn-border: #6b5a1e; --good-bg: #10261a; --good-border: #2e6b47;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 2.5rem 1.25rem 6rem; }
+
+  header.hero {
+    padding: 2.5rem 0 2rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 2rem;
+  }
+  header.hero h1 { font-size: 1.9rem; margin: 0 0 .5rem; line-height: 1.25; }
+  header.hero p.sub { color: var(--muted); font-size: 1.05rem; margin: 0; }
+
+  nav.toc {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 2.5rem;
+  }
+  nav.toc h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 .75rem; }
+  nav.toc ol { margin: 0; padding-left: 1.2rem; columns: 2; column-gap: 2rem; }
+  nav.toc li { margin-bottom: .4rem; break-inside: avoid; }
+  nav.toc a { color: var(--fg); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); text-decoration: underline; }
+  @media (max-width: 600px) { nav.toc ol { columns: 1; } }
+
+  section { margin-bottom: 3.25rem; scroll-margin-top: 1.5rem; }
+  section h2 {
+    font-size: 1.4rem;
+    display: flex;
+    align-items: baseline;
+    gap: .6rem;
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: .5rem;
+    margin-bottom: 1.1rem;
+  }
+  section h2 .num { color: var(--accent); font-variant-numeric: tabular-nums; }
+  h3 { font-size: 1.05rem; margin: 1.5rem 0 .5rem; }
+  p { margin: .8rem 0; }
+  ul, ol { padding-left: 1.4rem; }
+  li { margin-bottom: .4rem; }
+  strong { font-weight: 650; }
+  a { color: var(--accent); }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    background: var(--accent-soft);
+    padding: .1em .35em;
+    border-radius: 4px;
+    font-size: .9em;
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    padding: 1rem 1.1rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: .85rem;
+    line-height: 1.55;
+    margin: 1rem 0;
+  }
+  pre code { background: none; padding: 0; color: inherit; font-size: 1em; }
+
+  .callout {
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    margin: 1.2rem 0;
+    border: 1px solid var(--border);
+    font-size: .95rem;
+  }
+  .callout.warn { background: var(--warn-bg); border-color: var(--warn-border); }
+  .callout.good { background: var(--good-bg); border-color: var(--good-border); }
+  .callout.note { background: var(--card); }
+  .callout .label { font-weight: 700; text-transform: uppercase; font-size: .72rem; letter-spacing: .06em; display: block; margin-bottom: .35rem; color: var(--muted); }
+
+  .filecard {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 1rem 0;
+    overflow: hidden;
+  }
+  .filecard .path {
+    background: var(--card);
+    padding: .5rem .9rem;
+    font-family: ui-monospace, monospace;
+    font-size: .82rem;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .filecard pre { margin: 0; border-radius: 0; }
+
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .92rem; }
+  th, td { text-align: left; padding: .5rem .7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: .82rem; text-transform: uppercase; letter-spacing: .04em; }
+
+  .glossary dt { font-weight: 650; margin-top: 1rem; font-family: ui-monospace, monospace; font-size: .95rem; }
+  .glossary dd { margin: .25rem 0 0; color: var(--fg); }
+
+  .diagram {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+    margin: 1.2rem 0;
+    overflow-x: auto;
+  }
+  .chain {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .4rem;
+    font-size: .88rem;
+  }
+  .chain .box {
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: .5rem .75rem;
+    font-family: ui-monospace, monospace;
+    white-space: nowrap;
+  }
+  .chain .arrow { color: var(--muted); font-size: 1.1rem; }
+
+  .stack { display: flex; flex-direction: column-reverse; gap: .35rem; font-size: .88rem; }
+  .stack .layer {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: .55rem .8rem;
+    font-family: ui-monospace, monospace;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .stack .layer .prio { color: var(--muted); font-family: inherit; }
+  .stack .layer.tegra { background: var(--accent-soft); border-color: var(--accent); }
+
+  footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--border); padding-top: 1.5rem; margin-top: 3rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>Building a minimal Linux for the Jetson TX2 — and how any of this actually works</h1>
+  <p class="sub">A from-scratch explanation of Linux, boot chains, and the Yocto Project, written
+  against the real project files sitting next to this page — not a generic tutorial.</p>
+</header>
+
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#linux">What "Linux" actually means</a></li>
+    <li><a href="#boot">What happens when any computer boots</a></li>
+    <li><a href="#tx2-boot">The Jetson TX2's specific boot chain</a></li>
+    <li><a href="#l4t">Why NVIDIA hardware pins us to old software</a></li>
+    <li><a href="#yocto">What the Yocto Project actually is</a></li>
+    <li><a href="#vocab">Core vocabulary, mapped to real files</a></li>
+    <li><a href="#bsp">BSP layers, and why meta-tegra exists</a> &mdash; <a href="layers.html">full layer breakdown &rarr;</a></li>
+    <li><a href="#pipeline">What happens when you run bitbake</a></li>
+    <li><a href="#docker">Why the build runs inside Docker</a></li>
+    <li><a href="#flash">From build output to a booting board</a></li>
+    <li><a href="#layout">A tour of what we just created</a></li>
+  </ol>
+</nav>
+
+<section id="linux">
+  <h2><span class="num">1.</span> What "Linux" actually means</h2>
+  <p>"Linux" is, strictly, one thing: <strong>the kernel</strong> — a single program that starts
+  running the moment your device's bootloader hands it control, and never stops until you power
+  off. It talks directly to the CPU and hardware, and its job is to referee everything: which
+  process gets the CPU next, how physical memory is divided up, how files are read from storage,
+  how network packets move, which process is allowed to talk to which device.</p>
+  <p>Everything you'd normally call "a Linux system" — a shell prompt, <code>ls</code>,
+  a package manager, systemd, Python, a desktop — is <strong>userspace</strong>: ordinary programs
+  running on top of the kernel, using it through a fixed set of system calls
+  (<code>open()</code>, <code>read()</code>, <code>fork()</code>, ...). None of that is "Linux"
+  in the strict sense; it's software that a <strong>distribution</strong> (Ubuntu, Debian, Alpine,
+  Android, and — by the end of this project — our own) bundles on top of the Linux kernel.</p>
+  <p>That separation is exactly why Yocto exists and why this project is possible at all: the
+  kernel is one replaceable component, and a "distro" is really just a chosen combination of
+  kernel + C library + init system + package set. Yocto lets us pick every one of those
+  deliberately, instead of inheriting a desktop distro's defaults on a device with 4GB of
+  storage and no monitor.</p>
+</section>
+
+<section id="boot">
+  <h2><span class="num">2.</span> What happens when any computer boots</h2>
+  <p>Before Linux is running anything, several handoffs happen, each one loading and trusting the
+  next:</p>
+  <div class="diagram">
+    <div class="chain">
+      <div class="box">firmware</div><span class="arrow">→</span>
+      <div class="box">bootloader</div><span class="arrow">→</span>
+      <div class="box">kernel + device tree</div><span class="arrow">→</span>
+      <div class="box">rootfs mounted</div><span class="arrow">→</span>
+      <div class="box">init (PID 1)</div><span class="arrow">→</span>
+      <div class="box">userspace</div>
+    </div>
+  </div>
+  <ul>
+    <li><strong>Firmware</strong> — the first code that runs, baked into the chip itself
+    (UEFI/BIOS on a PC; a mask ROM on an embedded SoC). It knows nothing about your OS; its only
+    job is to bring up just enough hardware (RAM, storage) to find and load the next stage.</li>
+    <li><strong>Bootloader</strong> — a small program (GRUB on a PC; U-Boot or NVIDIA's CBoot on
+    embedded boards) that can read a filesystem, find a kernel image, load it into RAM, and jump
+    to it. This is the layer we configure for the TX2.</li>
+    <li><strong>Kernel + device tree</strong> — the kernel starts running, but on embedded
+    hardware it doesn't yet know what's actually wired to the chip. A PC can ask its firmware
+    ("ACPI tables") what hardware exists; an SoC board usually can't self-describe, so the
+    bootloader also hands the kernel a <strong>device tree blob</strong> (a compiled
+    <code>.dtb</code>) — a data structure saying "there's a UART at this memory address, an SD
+    controller at that one, this GPIO drives the LED," etc. Without the *exact right* DTB for
+    your board revision, the kernel boots but can't see most of the hardware.</li>
+    <li><strong>Root filesystem</strong> — once the kernel can talk to storage, it mounts the
+    root filesystem (rootfs) — the actual Linux distribution's files.</li>
+    <li><strong>init (PID 1)</strong> — the kernel starts exactly one userspace program as
+    process ID 1. Everything else on the system is, directly or indirectly, its child. This is
+    what actually brings up services, networking, and eventually a shell.</li>
+  </ul>
+</section>
+
+<section id="tx2-boot">
+  <h2><span class="num">3.</span> The Jetson TX2's specific boot chain</h2>
+  <p>The TX2 fills in that generic chain with concrete pieces, and we can point at the exact
+  lines in <code>sources/meta-tegra/conf/machine/jetson-tx2.conf</code> that configure each one:
+  </p>
+  <div class="diagram">
+    <div class="chain">
+      <div class="box">SoC BootROM</div><span class="arrow">→</span>
+      <div class="box">U-Boot (p2771-0000-500_defconfig)</div><span class="arrow">→</span>
+      <div class="box">Image (kernel)</div><span class="arrow">→</span>
+      <div class="box">tegra186-quill-...dtb</div><span class="arrow">→</span>
+      <div class="box">eMMC rootfs</div><span class="arrow">→</span>
+      <div class="box">init</div>
+    </div>
+  </div>
+  <div class="filecard">
+    <div class="path">sources/meta-tegra/conf/machine/jetson-tx2.conf</div>
+<pre><code>KERNEL_DEVICETREE ?= ".../tegra186-quill-p3310-1000-c03-00-base.dtb"
+UBOOT_MACHINE = "p2771-0000-500_defconfig"
+EMMC_SIZE ?= "31276924928"        # ~29 GiB — the board's onboard eMMC storage
+BOOTPART_SIZE ?= "8388608"        # size reserved for the boot partition
+ROOTFSPART_SIZE ?= "30064771072"  # size reserved for the root filesystem
+ODMDATA ?= "0x1090000"            # board strapping/config word the BootROM reads</code></pre>
+  </div>
+  <ul>
+    <li>The SoC's <strong>BootROM</strong> is unchangeable silicon logic. On power-up (or when you
+    force it via the recovery button) it reads <code>ODMDATA</code>-style configuration and loads
+    the first-stage bootloader from eMMC.</li>
+    <li><strong>U-Boot</strong>, built using the <code>p2771-0000-500_defconfig</code> defconfig
+    specific to the TX2 devkit carrier board, loads the kernel image and the matching device tree
+    blob.</li>
+    <li>The kernel (<code>KERNEL_IMAGETYPE = "Image"</code>, the standard uncompressed ARM64
+    kernel format) boots using <strong>exactly</strong> the device tree named above — this is a
+    real file, compiled from NVIDIA's Tegra186 device tree sources, describing this specific
+    module/carrier combination (the <code>quill</code> compute module on the
+    <code>p3310-1000-c03</code> devkit carrier board).</li>
+    <li>The kernel then mounts the root filesystem partition sized by <code>ROOTFSPART_SIZE</code>
+    out of that same eMMC, and starts init.</li>
+  </ul>
+</section>
+
+<section id="l4t">
+  <h2><span class="num">4.</span> Why this project uses 2018-era software — a choice, not a ceiling</h2>
+  <div class="callout warn">
+    <span class="label">Important, and specific to this board</span>
+    Everything in this project uses software from 2018. For the TX1 that used to be this board's
+    hard ceiling; for the <strong>TX2</strong>, it's a deliberate choice to stay on the branch
+    already checked out here, not something the hardware forces on us. Worth being precise about
+    the difference.
+  </div>
+  <p>NVIDIA doesn't upstream full support for Tegra chips into the mainline Linux kernel. Instead
+  they ship <strong>L4T (Linux for Tegra)</strong>: a patched kernel plus closed-source GPU/ISP
+  firmware and userspace libraries, versioned alongside their "JetPack" SDK releases. Each L4T
+  release supports a specific, fixed list of boards.</p>
+  <p><strong>The TX1 and TX2 both launched under L4T R28.3 (JetPack 3.3)</strong> — that's why
+  <code>sources/meta-tegra/conf/machine/</code> has both a <code>jetson-tx1.conf</code> and a
+  <code>jetson-tx2.conf</code> side by side on the same branch. But their support lifespans then
+  diverged sharply: NVIDIA dropped the TX1 after R28.3, while the <strong>TX2 kept receiving L4T
+  updates for years afterward</strong> — R32.x (JetPack 4.x) and beyond. So unlike the TX1
+  project this started as, targeting the TX2 does <em>not</em> require 2018-era software at all.</p>
+  <p><code>meta-tegra</code> (the community BSP layer we're using — more on it in Section 7)
+  mirrors NVIDIA's own version matrix branch-for-branch, which makes the TX2's longer support tail
+  visible directly in its branch list:</p>
+  <div class="filecard">
+    <div class="path">$ git ls-remote --heads https://github.com/OE4T/meta-tegra.git (excerpt)</div>
+<pre><code>thud-l4t-r28.3        ← contains conf/machine/jetson-tx2.conf — what we use
+kirkstone-l4t-r32.7.x ← TX2 / Xavier / Nano supported here too, no TX1
+master-l4t-r38.x      ← Orin-generation only, no TX1 or TX2</code></pre>
+  </div>
+  <p>So why stay on <code>thud-l4t-r28.3</code> for a TX2 build? Purely because that's the branch
+  already checked out in <code>sources/meta-tegra</code>, and re-pinning to
+  <code>kirkstone-l4t-r32.7.x</code> would mean a much bigger change than swapping
+  <code>MACHINE</code> — a different Poky release, a different required host/Docker environment,
+  and a different toolchain, none of which this session touched. The
+  <code>LAYERSERIES_COMPAT_tegra = "thud"</code> declaration in this branch's
+  <code>conf/layer.conf</code> still locks us to <strong>Poky's <code>thud</code> branch</strong>
+  (Yocto Project 2.6, late 2018) exactly as it did for the TX1 — that mechanical constraint hasn't
+  changed. What's changed is <em>why</em> we accept it: for the TX1 it was the only branch with any
+  support at all; for the TX2 it's simply the one already set up, with a newer option available
+  later if this project ever outgrows R28.3.</p>
+</section>
+
+<section id="yocto">
+  <h2><span class="num">5.</span> What the Yocto Project actually is</h2>
+  <p>It's easy to assume "Yocto" is a Linux distribution you download, like Ubuntu. It's the
+  opposite: Yocto is a <strong>build system</strong> that compiles a custom Linux distribution
+  <em>from source</em>, tailored to exactly the hardware and software you specify. Downloading
+  Ubuntu gives you someone else's finished decisions about what's installed; Yocto makes you
+  (mostly) make those decisions yourself, then builds the result.</p>
+  <p>It's really two things working together:</p>
+  <ul>
+    <li><strong>BitBake</strong> — the task-execution engine. Conceptually similar to
+    <code>make</code>, but instead of building one program, it parses thousands of small recipe
+    files, builds a dependency graph across all of them, and executes each one's build steps
+    (fetch, compile, install, package, ...) in the right order, in parallel where possible.</li>
+    <li><strong>OpenEmbedded-Core</strong> — the actual metadata: thousands of recipes that know
+    how to fetch and cross-compile everything from the C library up, plus the classes and
+    conventions that make them composable.</li>
+  </ul>
+  <p><strong>Poky</strong>, which we clone in this project, is the reference combination of
+  BitBake + OpenEmbedded-Core + a minimal default distro policy, maintained together by the
+  Yocto Project so the two always stay version-matched.</p>
+  <p>This is why an embedded project uses Yocto instead of "installing Ubuntu on an SD card": you
+  get a rootfs containing precisely the packages you chose, cross-compiled for the target CPU,
+  with a fully auditable build recipe for every byte in the image — valuable when your device has
+  4–16 GB of storage and needs to boot in seconds, not minutes.</p>
+</section>
+
+<section id="vocab">
+  <h2><span class="num">6.</span> Core vocabulary, mapped to real files</h2>
+  <p>Rather than define these abstractly, here's each term next to the actual file in this
+  project that demonstrates it.</p>
+  <dl class="glossary">
+    <dt>Recipe (<code>.bb</code>)</dt>
+    <dd>Instructions for building <em>one</em> piece of software: where to fetch it, how to
+    configure/compile/install it. Example: <code>sources/meta-tegra/recipes-bsp/tegra-binaries/tegra-binaries_28.3.0.bb</code>
+    downloads NVIDIA's redistributable L4T binaries.</dd>
+
+    <dt>Layer</dt>
+    <dd>A directory tree of recipes and configuration, identified by a
+    <code>conf/layer.conf</code> file. Layers stack by priority — <code>sources/meta-tegra/</code>
+    and <code>sources/meta-openembedded/meta-oe/</code> are both layers we added on top of Poky's
+    built-in ones.</dd>
+
+    <dt>BBLAYERS</dt>
+    <dd>The variable listing which layers BitBake actually loads, set in
+    <code>build/conf/bblayers.conf</code> — shown in full in Section 7 below.</dd>
+
+    <dt>Machine configuration</dt>
+    <dd><code>sources/meta-tegra/conf/machine/jetson-tx2.conf</code> — defines the target
+    hardware: CPU architecture, bootloader, kernel device tree, storage partition sizes. Selected
+    by setting <code>MACHINE = "jetson-tx2"</code> in <code>local.conf</code>.</dd>
+
+    <dt>Distro configuration</dt>
+    <dd>Policy that's independent of hardware — which init system, C library, package format.
+    We kept Poky's default (<code>DISTRO ?= "poky"</code> in <code>local.conf</code>), since
+    "minimal" doesn't require a custom distro policy on top of a custom machine.</dd>
+
+    <dt>Class (<code>.bbclass</code>)</dt>
+    <dd>Reusable behavior mixed into recipes — similar to a mixin. Example:
+    <code>sources/meta-tegra/classes/image_types_tegra.bbclass</code> defines the
+    <code>tegraflash</code> image type used in Section 10.</dd>
+
+    <dt>Task</dt>
+    <dd>Recipes are broken into staged steps BitBake schedules across the whole dependency graph:
+    <code>do_fetch</code> → <code>do_unpack</code> → <code>do_patch</code> →
+    <code>do_configure</code> → <code>do_compile</code> → <code>do_install</code> →
+    <code>do_package</code>. Detailed in Section 8.</dd>
+
+    <dt>Image recipe</dt>
+    <dd>A special recipe that doesn't build one program — it lists which packages to install into
+    a root filesystem. Our target, <code>core-image-minimal</code>, lives in
+    <code>sources/poky/meta/recipes-core/images/core-image-minimal.bb</code> and is Poky's
+    smallest sensible rootfs: just enough to boot and get a shell.</dd>
+
+    <dt>sstate-cache (shared state cache)</dt>
+    <dd>Like <code>ccache</code>, but for entire task outputs rather than just compiler objects.
+    Once a task's output is built for a given set of inputs, it's cached under
+    <code>sstate-cache/</code> (we pointed <code>SSTATE_DIR</code> there) so future builds reuse
+    it instead of recompiling identical work.</dd>
+  </dl>
+</section>
+
+<section id="bsp">
+  <h2><span class="num">7.</span> BSP layers, and why meta-tegra exists</h2>
+  <p>A <strong>Board Support Package (BSP) layer</strong> adds everything generic
+  OpenEmbedded-Core has no way of knowing about a specific board: the bootloader recipe and its
+  board-specific config, a kernel built with the right defconfig and device tree, any
+  vendor-proprietary firmware blobs, and the machine <code>.conf</code> file tying it together.
+  <code>meta-tegra</code> is exactly that for NVIDIA Tegra boards. Concretely, for the TX2, it
+  provides:</p>
+  <ul>
+    <li>A U-Boot recipe built with the <code>p2771-0000-500_defconfig</code> defconfig</li>
+    <li>A Linux kernel recipe with Tegra186 support and the matching device tree source</li>
+    <li><code>tegra-binaries</code> — fetches NVIDIA's redistributable L4T binary blobs (GPU/ISP
+    firmware, CBoot, flashing tools) that aren't open source and can't be built from scratch</li>
+    <li><code>tegra-configs-nvstartup</code> / <code>tegra-configs-udev</code> /
+    <code>tegra-nvpmodel</code> — board-specific startup, device-naming, and power-mode
+    configuration, listed as required dependencies directly in <code>tegra186.inc</code>:
+    <code>MACHINE_EXTRA_RDEPENDS = "tegra-nvpmodel tegra-configs-nvstartup
+    tegra-configs-udev"</code> (the TX1's <code>tegra210.inc</code> pulls in the same two configs
+    but has no <code>tegra-nvpmodel</code> entry — that package is TX2/Xavier-and-later, where
+    NVIDIA's power/clock modeling tool actually applies)</li>
+  </ul>
+  <p>Here is the actual layer stack this project ends up with, from
+  <code>build/conf/bblayers.conf</code>, lowest-priority (generic) at the bottom of the visual
+  stack to most-specific (our board) toward the top:</p>
+  <div class="diagram">
+    <div class="stack">
+      <div class="layer tegra"><span>meta-tegra</span><span class="prio">TX2 board support</span></div>
+      <div class="layer"><span>meta-openembedded/meta-oe</span><span class="prio">extra common recipes</span></div>
+      <div class="layer"><span>poky/meta-yocto-bsp</span><span class="prio">reference/QEMU machines (unused here)</span></div>
+      <div class="layer"><span>poky/meta-poky</span><span class="prio">default distro policy</span></div>
+      <div class="layer"><span>poky/meta</span><span class="prio">OpenEmbedded-Core — the generic base</span></div>
+    </div>
+  </div>
+  <p>This is exactly what <code>bitbake-layers show-layers</code> reports once you're in the build
+  environment — I ran it against this project's actual configuration to confirm all five layers
+  load with no conflicts:</p>
+  <div class="filecard">
+    <div class="path">$ bitbake-layers show-layers</div>
+<pre><code>layer                 path                                      priority
+==========================================================================
+meta                  /work/sources/poky/meta                   5
+meta-poky              /work/sources/poky/meta-poky              5
+meta-yocto-bsp         /work/sources/poky/meta-yocto-bsp         5
+meta-oe                /work/sources/meta-openembedded/meta-oe   6
+meta-tegra             /work/sources/meta-tegra                  5</code></pre>
+  </div>
+  <div class="callout note">
+    <span class="label">Going deeper</span>
+    This section is a summary. For a full recipe-by-recipe walkthrough of all five layers — what
+    each one actually ships, how <code>PREFERRED_PROVIDER</code> and layer priority resolve
+    collisions, and how <code>meta-tegra</code> patches a <em>different</em> layer's recipe via its
+    <code>external/</code> mechanism — see
+    <a href="layers.html">The five Yocto layers, in depth</a>.
+  </div>
+</section>
+
+<section id="pipeline">
+  <h2><span class="num">8.</span> What happens when you run <code>bitbake core-image-minimal</code></h2>
+  <p>This hasn't been run in full yet in this project (see the callout at the end of this
+  section), but here's exactly what it will do once started, stage by stage, per recipe, across
+  the whole dependency graph:</p>
+  <ol>
+    <li><strong>Parse</strong> — every recipe in every layer in <code>BBLAYERS</code> is parsed
+    and a dependency graph is built. I validated this step already:
+    <code>1532 .bb files, 2172 targets, 0 errors</code> for this exact layer/machine
+    combination.</li>
+    <li><strong>do_fetch</strong> — downloads each recipe's source (tarball or git repo) into
+    <code>DL_DIR</code> (<code>downloads/</code> in this project — shared across rebuilds, safe to
+    keep forever).</li>
+    <li><strong>do_unpack</strong> — extracts the fetched source into a per-recipe working
+    directory under <code>TMPDIR</code>.</li>
+    <li><strong>do_patch</strong> — applies any patches the recipe specifies, on top of the
+    unpacked pristine source.</li>
+    <li><strong>do_configure</strong> — runs the project's own configure step (autotools, cmake,
+    kernel <code>oldconfig</code>, ...), targeting the TX2's <code>aarch64</code> architecture via
+    a cross-compilation toolchain BitBake builds for itself first.</li>
+    <li><strong>do_compile</strong> — actually compiles it, cross-compiled for ARM64, never
+    running any of this code on your x86_64 build machine.</li>
+    <li><strong>do_install</strong> — stages the compiled output into a temporary "destination
+    directory," mimicking a real root filesystem layout.</li>
+    <li><strong>do_package</strong> — splits that staged output into one or more installable
+    binary packages (<code>.rpm</code> here, per <code>PACKAGE_CLASSES</code> in
+    <code>local.conf</code>).</li>
+    <li><strong>do_rootfs</strong> — once every package <code>core-image-minimal</code> needs
+    exists, they're all installed together into an actual root filesystem tree.</li>
+    <li><strong>do_image_*</strong> — the rootfs tree is packaged into final artifacts under
+    <code>build/tmp/deploy/images/jetson-tx2/</code> — for us, that includes a
+    <code>tegraflash.zip</code> (Section 10).</li>
+  </ol>
+  <div class="callout note">
+    <span class="label">Scale, for context</span>
+    A first build compiles roughly 1,500 recipes from source — most of userspace Linux, plus a
+    cross-toolchain, plus the kernel — which typically means tens of gigabytes downloaded and
+    several hours of compilation even on a fast multi-core machine. Every subsequent build reuses
+    <code>sstate-cache</code> and is dramatically faster, which is why that cache lives outside
+    <code>build/</code> and survives you deleting and recreating the build directory.
+  </div>
+  <div class="callout warn">
+    <span class="label">Not run yet, by design</span>
+    This session set up and <em>validated</em> the configuration (layers resolve, 0 parse errors,
+    <code>MACHINE</code> and <code>IMAGE_FSTYPES</code> both confirmed correct via
+    <code>bitbake -e</code>) but deliberately stopped short of running the real multi-hour build.
+    When you're ready: <code>./docker/build.sh</code>, then inside the container
+    <code>source sources/poky/oe-init-build-env build && bitbake core-image-minimal</code>.
+  </div>
+</section>
+
+<section id="docker">
+  <h2><span class="num">9.</span> Why the build runs inside Docker</h2>
+  <p>Yocto 2.6 ("thud") is 2018-era software, and BitBake is sensitive to exactly what's on the
+  build host: its Python version, its C library, even which packages are present. This machine
+  runs Ubuntu 24.04 (Python 3.12, glibc 2.39, gcc 13) — new enough that building "thud" directly
+  on it would hit real incompatibilities.</p>
+  <p>Rather than fight that by patching old BitBake to understand a much newer host, this project
+  builds inside a <strong>Docker container running Ubuntu 18.04</strong> — the environment
+  "thud" actually expects — defined once in <code>docker/Dockerfile</code> and never drifting,
+  regardless of what's installed on your laptop.</p>
+  <p>This wasn't a hypothetical concern — it's exactly what happened while setting this project
+  up. The Yocto 2.6 manual's documented package list for Ubuntu doesn't happen to mention the
+  <code>file</code> utility, but BitBake's own startup sanity-check (<code>HOSTTOOLS</code>)
+  refuses to run without it:</p>
+  <div class="filecard">
+    <div class="path">first run inside the freshly-built container</div>
+<pre><code>ERROR: The following required tools (as specified by HOSTTOOLS) appear to be
+unavailable in PATH, please install them in order to proceed:
+  file</code></pre>
+  </div>
+  <p>That's a real, concrete example of the class of problem strict environment-pinning exists to
+  solve: a one-line fix in <code>docker/Dockerfile</code>
+  (<code>apt-get install ... file ...</code>) and it never has to be diagnosed again, by anyone
+  who builds this project, on any host.</p>
+  <p><code>docker/build.sh</code> wraps the two commands you'd otherwise run by hand: it builds
+  the image (fast, cached after the first time) and drops you into a shell with
+  <code>sources/</code>, <code>build/</code>, <code>downloads/</code>, and
+  <code>sstate-cache/</code> bind-mounted from this project directory, so nothing produced inside
+  the container is lost when it exits.</p>
+</section>
+
+<section id="flash">
+  <h2><span class="num">10.</span> From build output to a booting board</h2>
+  <p>Once <code>bitbake core-image-minimal</code> finishes, the artifacts land in
+  <code>build/tmp/deploy/images/jetson-tx2/</code>. We specifically configured
+  <code>local.conf</code> to produce a flashable package, using meta-tegra's
+  <code>tegraflash</code> image type:</p>
+  <div class="filecard">
+    <div class="path">build/conf/local.conf</div>
+<pre><code>IMAGE_CLASSES += "image_types_tegra"
+IMAGE_FSTYPES += "tegraflash"</code></pre>
+  </div>
+  <div class="callout good">
+    <span class="label">Verified, not assumed</span>
+    <code>IMAGE_CLASSES</code> has to be set explicitly — meta-tegra doesn't inherit its own
+    flashing class by default. Leaving it out was actually tried first in this session and broke
+    parsing for <em>every</em> image recipe in the build (<code>No IMAGE_CMD defined for
+    IMAGE_FSTYPES entry 'tegraflash'</code>) — adding the class line fixed it, confirmed with a
+    clean <code>bitbake -p</code> afterward.
+  </div>
+  <p>That combination produces
+  <code>core-image-minimal-jetson-tx2.tegraflash.zip</code>, containing the kernel, the device
+  tree, the rootfs image, and a generated <code>doflash.sh</code> script that wraps NVIDIA's own
+  <code>tegraflash.py</code> tool.</p>
+  <p>To actually get that onto your board:</p>
+  <ol>
+    <li><strong>Put the TX2 into Force Recovery Mode</strong> — with the board powered off, hold
+    the <strong>RECOVERY</strong> button, tap <strong>RESET</strong> (or apply power) while still
+    holding it, then release after a couple seconds. In this mode the SoC's BootROM itself exposes
+    a USB device to your host — no working bootloader on the board is required, which is also how
+    you recover a bricked one.</li>
+    <li><strong>Connect the TX2 to your build machine via USB</strong>, and confirm the host sees
+    it (typically <code>lsusb</code> shows an NVIDIA device in APX mode).</li>
+    <li><strong>Unzip and run the flash script</strong> from inside the container, as root/with
+    the right USB permissions, from the extracted <code>tegraflash.zip</code>:
+    <code>./doflash.sh</code>. It calls
+    <code>tegraflash.py --bl cboot.bin --bct ... --cmd "flash;reboot" ...</code>, which writes
+    every partition and reboots the board straight into the new image.</li>
+  </ol>
+  <p>None of this was run in this session — it requires the physical board connected over USB,
+  which only you can do — but the artifact that makes it possible is now configured correctly to
+  be produced by the build.</p>
+</section>
+
+<section id="layout">
+  <h2><span class="num">11.</span> A tour of what we just created</h2>
+  <table>
+    <tr><th>Path</th><th>What it is</th><th>Tracked in git?</th></tr>
+    <tr><td><code>index.html</code></td><td>This file.</td><td>Yes</td></tr>
+    <tr><td><code>layers.html</code></td>
+        <td>In-depth, recipe-by-recipe walkthrough of all five loaded Yocto layers — see
+        <a href="layers.html">the full breakdown</a>.</td><td>Yes</td></tr>
+    <tr><td><code>docker/Dockerfile</code>, <code>docker/build.sh</code></td>
+        <td>The Ubuntu 18.04 build environment and its launcher.</td><td>Yes</td></tr>
+    <tr><td><code>sources/</code></td>
+        <td>Git checkouts of <code>poky</code>, <code>meta-openembedded</code>,
+        <code>meta-tegra</code> — all reproducible from the exact branches documented above, so
+        not worth committing.</td><td>No (gitignored)</td></tr>
+    <tr><td><code>build/</code></td>
+        <td>BitBake's working directory: <code>conf/local.conf</code>, <code>conf/bblayers.conf</code>,
+        and (once you build) <code>tmp/</code> with all compiled output — many GB, fully
+        disposable and regeneratable.</td><td>No, except below</td></tr>
+    <tr><td><code>build/conf-templates/</code></td>
+        <td>Hand-verified copies of the final <code>local.conf</code> / <code>bblayers.conf</code>,
+        kept in git specifically so the disposable <code>build/</code> directory can be safely
+        deleted and regenerated without losing the configuration decisions made in this
+        session.</td><td>Yes</td></tr>
+    <tr><td><code>downloads/</code></td>
+        <td>BitBake's <code>DL_DIR</code> — every upstream source tarball/repo fetched once,
+        reused forever, safe to share across unrelated Yocto builds too.</td><td>No</td></tr>
+    <tr><td><code>sstate-cache/</code></td>
+        <td>BitBake's <code>SSTATE_DIR</code> — cached task outputs; lets you delete
+        <code>build/tmp</code> and rebuild fast instead of from scratch.</td><td>No</td></tr>
+  </table>
+  <p>Both caches live outside <code>build/</code> on purpose: you can freely blow away
+  <code>build/tmp</code> (or all of <code>build/</code>, since the two conf files are safely
+  preserved under <code>conf-templates/</code>) without losing a single already-downloaded
+  tarball or already-compiled package.</p>
+</section>
+
+<footer>
+  Written as part of setting up this project — every configuration value, error message, and
+  command output above was produced by actually running the tools against this exact repository,
+  not from general recollection of how Yocto works elsewhere.
+</footer>
+
+</div>
+</body>
+</html>

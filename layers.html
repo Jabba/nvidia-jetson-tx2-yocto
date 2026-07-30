@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The five Yocto layers, in depth — Jetson TX2 project</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --fg: #1a1d21;
+    --muted: #5b6470;
+    --card: #f5f6f8;
+    --border: #e0e3e8;
+    --code-bg: #282c34;
+    --code-fg: #e6e6e6;
+    --accent: #2b6cb0;
+    --accent-soft: #eaf2fb;
+    --warn-bg: #fff8e6;
+    --warn-border: #e8c766;
+    --good-bg: #eafaf0;
+    --good-border: #7fd3a0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --fg: #e7e9ec;
+      --muted: #9aa4b2;
+      --card: #1c1f24;
+      --border: #2c3038;
+      --code-bg: #0d0f12;
+      --code-fg: #d8dee9;
+      --accent: #6ea8e0;
+      --accent-soft: #1c2733;
+      --warn-bg: #2a2410;
+      --warn-border: #6b5a1e;
+      --good-bg: #10261a;
+      --good-border: #2e6b47;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #ffffff; --fg: #1a1d21; --muted: #5b6470; --card: #f5f6f8; --border: #e0e3e8;
+    --code-bg: #282c34; --code-fg: #e6e6e6; --accent: #2b6cb0; --accent-soft: #eaf2fb;
+    --warn-bg: #fff8e6; --warn-border: #e8c766; --good-bg: #eafaf0; --good-border: #7fd3a0;
+  }
+  :root[data-theme="dark"] {
+    --bg: #14161a; --fg: #e7e9ec; --muted: #9aa4b2; --card: #1c1f24; --border: #2c3038;
+    --code-bg: #0d0f12; --code-fg: #d8dee9; --accent: #6ea8e0; --accent-soft: #1c2733;
+    --warn-bg: #2a2410; --warn-border: #6b5a1e; --good-bg: #10261a; --good-border: #2e6b47;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 2.5rem 1.25rem 6rem; }
+
+  header.hero {
+    padding: 2.5rem 0 2rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 2rem;
+  }
+  header.hero .back { display: inline-block; margin-bottom: 1rem; font-size: .88rem; color: var(--muted); text-decoration: none; }
+  header.hero .back:hover { color: var(--accent); }
+  header.hero h1 { font-size: 1.9rem; margin: 0 0 .5rem; line-height: 1.25; }
+  header.hero p.sub { color: var(--muted); font-size: 1.05rem; margin: 0; }
+
+  nav.toc {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 2.5rem;
+  }
+  nav.toc h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 .75rem; }
+  nav.toc ol { margin: 0; padding-left: 1.2rem; columns: 2; column-gap: 2rem; }
+  nav.toc li { margin-bottom: .4rem; break-inside: avoid; }
+  nav.toc a { color: var(--fg); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); text-decoration: underline; }
+  @media (max-width: 600px) { nav.toc ol { columns: 1; } }
+
+  section { margin-bottom: 3.25rem; scroll-margin-top: 1.5rem; }
+  section h2 {
+    font-size: 1.4rem;
+    display: flex;
+    align-items: baseline;
+    gap: .6rem;
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: .5rem;
+    margin-bottom: 1.1rem;
+  }
+  section h2 .num { color: var(--accent); font-variant-numeric: tabular-nums; }
+  h3 { font-size: 1.05rem; margin: 1.5rem 0 .5rem; }
+  p { margin: .8rem 0; }
+  ul, ol { padding-left: 1.4rem; }
+  li { margin-bottom: .4rem; }
+  strong { font-weight: 650; }
+  a { color: var(--accent); }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    background: var(--accent-soft);
+    padding: .1em .35em;
+    border-radius: 4px;
+    font-size: .9em;
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    padding: 1rem 1.1rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: .85rem;
+    line-height: 1.55;
+    margin: 1rem 0;
+  }
+  pre code { background: none; padding: 0; color: inherit; font-size: 1em; }
+
+  .callout {
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    margin: 1.2rem 0;
+    border: 1px solid var(--border);
+    font-size: .95rem;
+  }
+  .callout.warn { background: var(--warn-bg); border-color: var(--warn-border); }
+  .callout.good { background: var(--good-bg); border-color: var(--good-border); }
+  .callout.note { background: var(--card); }
+  .callout .label { font-weight: 700; text-transform: uppercase; font-size: .72rem; letter-spacing: .06em; display: block; margin-bottom: .35rem; color: var(--muted); }
+
+  .filecard {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 1rem 0;
+    overflow: hidden;
+  }
+  .filecard .path {
+    background: var(--card);
+    padding: .5rem .9rem;
+    font-family: ui-monospace, monospace;
+    font-size: .82rem;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .filecard pre { margin: 0; border-radius: 0; }
+
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .92rem; }
+  th, td { text-align: left; padding: .5rem .7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: .82rem; text-transform: uppercase; letter-spacing: .04em; }
+
+  .glossary dt { font-weight: 650; margin-top: 1rem; font-family: ui-monospace, monospace; font-size: .95rem; }
+  .glossary dd { margin: .25rem 0 0; color: var(--fg); }
+
+  .diagram {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+    margin: 1.2rem 0;
+    overflow-x: auto;
+  }
+  .chain {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .4rem;
+    font-size: .88rem;
+  }
+  .chain .box {
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: .5rem .75rem;
+    font-family: ui-monospace, monospace;
+    white-space: nowrap;
+  }
+  .chain .arrow { color: var(--muted); font-size: 1.1rem; }
+
+  .stack { display: flex; flex-direction: column-reverse; gap: .35rem; font-size: .88rem; }
+  .stack .layer {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: .55rem .8rem;
+    font-family: ui-monospace, monospace;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .stack .layer .prio { color: var(--muted); font-family: inherit; }
+  .stack .layer.tegra { background: var(--accent-soft); border-color: var(--accent); }
+
+  .layercard {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.4rem 1.5rem;
+    margin: 1.4rem 0;
+  }
+  .layercard.tegra { border-color: var(--accent); background: var(--accent-soft); }
+  .layercard h3 { margin-top: 0; font-size: 1.15rem; display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
+  .layercard h3 code { font-size: .85em; }
+  .layercard .meta { display: flex; gap: 1.2rem; flex-wrap: wrap; font-size: .82rem; color: var(--muted); margin: .3rem 0 1rem; }
+  .layercard .meta span strong { color: var(--fg); font-weight: 600; }
+
+  footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--border); padding-top: 1.5rem; margin-top: 3rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <a class="back" href="index.html">&larr; Back to project overview</a>
+  <h1>The five Yocto layers, in depth</h1>
+  <p class="sub">Every layer this build actually loads — what each one contributes, why it's
+  there, how they depend on each other, and the real recipes/config that prove it — read against
+  this project's own <code>sources/</code> checkouts, not from general Yocto documentation.</p>
+</header>
+
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#recap">How layers compose, briefly</a></li>
+    <li><a href="#core">1. <code>meta</code> — OpenEmbedded-Core</a></li>
+    <li><a href="#poky">2. <code>meta-poky</code> — the Poky distro policy</a></li>
+    <li><a href="#bsp-ref">3. <code>meta-yocto-bsp</code> — reference machines</a></li>
+    <li><a href="#oe">4. <code>meta-openembedded/meta-oe</code></a></li>
+    <li><a href="#tegra">5. <code>meta-tegra</code> — the TX2 BSP</a></li>
+    <li><a href="#priority">Priority, collisions, and load order</a></li>
+    <li><a href="#dependency">The dependency graph between layers</a></li>
+    <li><a href="#trace">Tracing one setting through all five layers</a></li>
+  </ol>
+</nav>
+
+<section id="recap">
+  <h2><span class="num">&sect;</span> How layers compose, briefly</h2>
+  <p>Every layer is just a directory with a <code>conf/layer.conf</code> in it. That file registers
+  the layer under a <strong>collection name</strong> (<code>BBFILE_COLLECTIONS</code>), tells
+  BitBake where to find its recipes (<code>BBFILES</code>), declares a
+  <strong>priority</strong> (<code>BBFILE_PRIORITY_&lt;collection&gt;</code>), and can declare
+  <strong>dependencies</strong> on other collections (<code>LAYERDEPENDS_&lt;collection&gt;</code>).
+  None of that does anything on its own &mdash; a layer only actually gets used once its path is
+  listed in <code>BBLAYERS</code> inside <code>build/conf/bblayers.conf</code>, which is this
+  project's actual opt-in list:</p>
+  <div class="filecard">
+    <div class="path">build/conf-templates/bblayers.conf</div>
+<pre><code>BBLAYERS ?= " \
+  /work/sources/poky/meta \
+  /work/sources/poky/meta-poky \
+  /work/sources/poky/meta-yocto-bsp \
+  /work/sources/meta-openembedded/meta-oe \
+  /work/sources/meta-tegra \
+  "</code></pre>
+  </div>
+  <p>That's the entire universe this build draws from: five layers, in that order. Everything
+  below is one of those five, in the same order they're listed above.</p>
+</section>
+
+<section id="core">
+  <h2><span class="num">1.</span> <code>meta</code> &mdash; OpenEmbedded-Core</h2>
+  <div class="layercard">
+    <h3><code>sources/poky/meta</code> <span style="color:var(--muted); font-weight:400;">collection: <code>core</code></span></h3>
+    <div class="meta">
+      <span>Priority: <strong>5</strong></span>
+      <span>Depends on: <strong>nothing</strong> (the root)</span>
+      <span>Series: <strong>thud</strong></span>
+    </div>
+    <p style="margin-top:0;">The foundation every other layer here builds on. This is <strong>not</strong>
+    Tegra- or embedded-specific at all &mdash; it's the generic core of the whole Yocto Project:
+    the base <code>bitbake.conf</code>, the C library and toolchain recipes (glibc, gcc, binutils),
+    core userspace (busybox, systemd/sysvinit, udev), the packaging classes
+    (<code>package_rpm.bbclass</code>, <code>package_ipk.bbclass</code>...), and the machine/arch
+    tune files every other layer's machine <code>.conf</code> ultimately <code>require</code>s.</p>
+  </div>
+  <p>Its <code>conf/layer.conf</code> is the one every other layer here implicitly needs, because
+  every other layer's <code>LAYERDEPENDS_*</code> points back at <code>core</code>:</p>
+  <div class="filecard">
+    <div class="path">sources/poky/meta/conf/layer.conf (excerpt)</div>
+<pre><code>BBFILE_COLLECTIONS += "core"
+BBFILE_PRIORITY_core = "5"
+LAYERSERIES_CORENAMES = "thud"
+LAYERSERIES_COMPAT_core = "thud"
+COREBASE = '${@os.path.normpath("${LAYERDIR}/../")}'</code></pre>
+  </div>
+  <p><code>COREBASE</code> is worth noticing: it's computed as "one directory up from
+  <code>meta/</code>" &mdash; i.e. <code>sources/poky</code>. Every other layer's own
+  <code>layer.conf</code> and machine includes ultimately resolve paths relative to this. It's also
+  the layer that defines <code>LAYERSERIES_COMPAT_core = "thud"</code>, the exact string every
+  other layer here has to match in its own <code>LAYERSERIES_COMPAT_*</code> or BitBake refuses to
+  load it at all &mdash; this is the mechanical enforcement behind the "everything is pinned to
+  2018" constraint described in the project overview.</p>
+  <p>Recipe categories under <code>meta/recipes-*</code> give a sense of scope &mdash; this one
+  layer alone covers <code>recipes-core</code> (init, C library, base utilities),
+  <code>recipes-devtools</code> (the entire cross-toolchain: gcc, binutils, cmake, python),
+  <code>recipes-kernel</code>, <code>recipes-bsp</code>, <code>recipes-connectivity</code>,
+  <code>recipes-graphics</code>, <code>recipes-multimedia</code>, <code>recipes-extended</code>,
+  <code>recipes-gnome</code>, <code>recipes-rt</code>, <code>recipes-sato</code>, and
+  <code>recipes-support</code>. Roughly a thousand of the ~1,500 recipes this build parses come from
+  here alone.</p>
+</section>
+
+<section id="poky">
+  <h2><span class="num">2.</span> <code>meta-poky</code> &mdash; the Poky distro policy</h2>
+  <div class="layercard">
+    <h3><code>sources/poky/meta-poky</code> <span style="color:var(--muted); font-weight:400;">collection: <code>yocto</code></span></h3>
+    <div class="meta">
+      <span>Priority: <strong>5</strong></span>
+      <span>Depends on: <strong><code>core</code></strong></span>
+    </div>
+    <p style="margin-top:0;">Much smaller and much more specific: it doesn't add hardware support
+    or a large recipe set, it adds <strong>distro policy</strong> &mdash; the answer to "given the
+    generic building blocks in <code>core</code>, what does a coherent, opinionated Linux
+    distribution actually look like." This is what <code>DISTRO = "poky"</code> in
+    <code>local.conf</code> actually selects.</p>
+  </div>
+  <div class="filecard">
+    <div class="path">sources/poky/meta-poky/conf/layer.conf (excerpt)</div>
+<pre><code>BBFILE_COLLECTIONS += "yocto"
+BBFILE_PRIORITY_yocto = "5"
+LAYERDEPENDS_yocto = "core"
+REQUIRED_POKY_BBLAYERS_CONF_VERSION = "2"</code></pre>
+  </div>
+  <p>Concretely it contributes very little in recipe count &mdash; just three package
+  customizations under <code>recipes-core/</code> (<code>busybox</code>,
+  <code>psplash</code> the boot splash, and a small <code>tiny-init</code> recipe) &mdash; plus
+  the actual <code>conf/distro/poky.conf</code> policy file that sets things like the default
+  package format preference and version/tclibc defaults referenced from
+  <code>local.conf</code>. <code>REQUIRED_POKY_BBLAYERS_CONF_VERSION</code> is also the exact
+  mechanism behind the <code>POKY_BBLAYERS_CONF_VERSION = "2"</code> line at the top of this
+  project's own <code>bblayers.conf</code> &mdash; if those two didn't match, BitBake would refuse
+  to start, telling you your <code>bblayers.conf</code> is out of date for this Poky release.</p>
+</section>
+
+<section id="bsp-ref">
+  <h2><span class="num">3.</span> <code>meta-yocto-bsp</code> &mdash; reference machines</h2>
+  <div class="layercard">
+    <h3><code>sources/poky/meta-yocto-bsp</code> <span style="color:var(--muted); font-weight:400;">collection: <code>yoctobsp</code></span></h3>
+    <div class="meta">
+      <span>Priority: <strong>5</strong></span>
+      <span>Depends on: <strong>implicitly <code>core</code></strong></span>
+    </div>
+    <p style="margin-top:0;">Ships with Poky as the set of "reference hardware" machine
+    definitions the Yocto Project itself supports and tests against &mdash; QEMU targets and a
+    handful of real reference boards.</p>
+  </div>
+  <p>Its <code>conf/machine/</code> directory is the tell: <code>beaglebone-yocto.conf</code>,
+  <code>edgerouter.conf</code>, <code>genericx86.conf</code>, <code>genericx86-64.conf</code>,
+  <code>mpc8315e-rdb.conf</code>. None of these is <code>jetson-tx2</code> &mdash; <strong>this
+  layer contributes zero machine support to this specific build.</strong> It's loaded purely
+  because it's part of Poky's default <code>bblayers.conf</code> template and doing no harm sitting
+  there at the same priority (<code>5</code>) as everything else non-Tegra; <code>MACHINE =
+  "jetson-tx2"</code> in <code>local.conf</code> simply never matches anything this layer defines,
+  so none of its recipes or machine <code>.conf</code> logic is ever selected. It's listed here for
+  completeness because it genuinely is one of the five loaded layers, not because it does anything
+  for the TX2.</p>
+</section>
+
+<section id="oe">
+  <h2><span class="num">4.</span> <code>meta-openembedded/meta-oe</code></h2>
+  <div class="layercard">
+    <h3><code>sources/meta-openembedded/meta-oe</code> <span style="color:var(--muted); font-weight:400;">collection: <code>openembedded-layer</code></span></h3>
+    <div class="meta">
+      <span>Priority: <strong>6</strong></span>
+      <span>Depends on: <strong><code>core</code></strong></span>
+    </div>
+    <p style="margin-top:0;">The community's general-purpose recipe layer: thousands of
+    additional packages that are broadly useful but don't belong in OpenEmbedded-Core because
+    they're not needed to build a minimal system. <code>meta-openembedded</code> upstream is
+    actually a bundle of many sub-layers (<code>meta-oe</code>, <code>meta-networking</code>,
+    <code>meta-python</code>, <code>meta-filesystems</code>, ...); this project only loads
+    <code>meta-oe</code> itself, the largest and most general of the set.</p>
+  </div>
+  <div class="filecard">
+    <div class="path">sources/meta-openembedded/meta-oe/conf/layer.conf (excerpt)</div>
+<pre><code>BBFILE_COLLECTIONS += "openembedded-layer"
+BBFILE_PRIORITY_openembedded-layer = "6"
+LAYERDEPENDS_openembedded-layer = "core"
+LICENSE_PATH += "${LAYERDIR}/licenses"</code></pre>
+  </div>
+  <p>Note the priority: <strong>6</strong>, higher than every other layer in this stack (all at
+  <code>5</code>). Priority only matters when two layers ship a recipe with the <em>identical</em>
+  name/version &mdash; the higher-priority one wins. So <code>meta-oe</code> is deliberately
+  positioned to be able to override an OpenEmbedded-Core recipe if it ever needs to, without that
+  override silently losing to <code>core</code>. It doesn't currently need to for anything this
+  build uses &mdash; but see &sect;7 below for how <code>meta-tegra</code> reaches into this layer's
+  <em>content</em> a different way.</p>
+  <p>Recipe categories here are broad and mostly generic (<code>recipes-connectivity</code>,
+  <code>recipes-crypto</code>, <code>recipes-benchmark</code>, <code>recipes-navigation</code>,
+  <code>recipes-shells</code>, and so on) &mdash; none of it TX2-specific. In this project it's
+  present mainly as a dependency source: several packages <code>meta-tegra</code>'s own recipes
+  pull in (for example multimedia/codec support packages referenced by the GStreamer/OMX Tegra
+  bindings) live here rather than in core.</p>
+</section>
+
+<section id="tegra">
+  <h2><span class="num">5.</span> <code>meta-tegra</code> &mdash; the TX2 BSP</h2>
+  <div class="layercard tegra">
+    <h3><code>sources/meta-tegra</code> <span style="color:var(--muted); font-weight:400;">collection: <code>tegra</code></span></h3>
+    <div class="meta">
+      <span>Priority: <strong>5</strong></span>
+      <span>Depends on: <strong><code>core</code></strong></span>
+      <span>Branch: <strong><code>thud-l4t-r28.3</code></strong></span>
+    </div>
+    <p style="margin-top:0;">The reason this project exists: the actual Board Support Package for
+    NVIDIA Tegra hardware, maintained by the <a href="https://github.com/OE4T/meta-tegra">OE4T</a>
+    community project. Every piece of TX2-specific knowledge &mdash; bootloader, kernel, device
+    tree, closed-source GPU/ISP firmware, partition layout &mdash; lives here. Nothing above this
+    layer knows the TX2 exists; everything below it is generic enough to not need to.</p>
+  </div>
+
+  <h3>What it actually ships, recipe by recipe</h3>
+  <table>
+    <tr><th>Directory</th><th>Contributes</th></tr>
+    <tr><td><code>recipes-kernel/linux/linux-tegra_4.4.bb</code></td>
+        <td>The Linux 4.4 kernel recipe, with NVIDIA's L4T patches applied and the
+        <code>tegra186/defconfig</code> this board uses (the recipe declares
+        <code>COMPATIBLE_MACHINE = "(tegra186|tegra210)"</code>, so the same <code>.bb</code>
+        serves both the TX1 and TX2 &mdash; only the defconfig subdirectory it pulls from differs,
+        selected by <code>SOC_FAMILY</code>). This layer also carries a separate <code>3.10</code>
+        kernel recipe for the older <code>jetson-tk1</code> machine, unrelated to this
+        board.</td></tr>
+    <tr><td><code>recipes-bsp/u-boot/u-boot-tegra_2016.07.bb</code></td>
+        <td>U-Boot 2016.07, built with the <code>p2771-0000-500_defconfig</code> defconfig
+        (<code>UBOOT_MACHINE</code> in <code>jetson-tx2.conf</code>) &mdash; the exact bootloader
+        variant for the TX2 devkit carrier board.</td></tr>
+    <tr><td><code>recipes-bsp/tegra-binaries/tegra-binaries_28.3.0.bb</code> and siblings</td>
+        <td>Fetches and repackages NVIDIA's redistributable L4T R28.3 binary tarball directly from
+        NVIDIA's servers &mdash; for this board, specifically
+        <code>tx2-Tegra186_Linux_R28.3.0_aarch64.tbz2</code> off
+        <code>developer.download.nvidia.com</code> (a different tarball than the TX1 build fetches;
+        pinned by exact <code>md5sum</code>/<code>sha256sum</code> in
+        <code>tegra-binaries-tegra186-28.3.0.inc</code>) &mdash; closed-source GPU/ISP firmware,
+        CBoot, and flashing tools that have no source to compile from. Split into many small
+        packages: <code>tegra-firmware</code>, <code>xserver-xorg-video-nvidia</code>,
+        <code>libdrm-nvdc</code>, <code>gstreamer1.0-plugins-tegra</code>, and more.</td></tr>
+    <tr><td><code>recipes-bsp/tegra-binaries/tegra-configs_28.3.0.bb</code></td>
+        <td>Splits L4T's bundled config tarball into <code>tegra-configs-udev</code> (the
+        <code>99-tegra-devices.rules</code> device-naming rules referenced in the project overview),
+        <code>tegra-configs-nvstartup</code> (the <code>nvstartup</code> service/init script that
+        brings up GPU-related state at boot), plus <code>-xorg</code>, <code>-omx-tegra</code>, and
+        <code>-pulseaudio</code> sub-packages.</td></tr>
+    <tr><td><code>recipes-bsp/tegra-binaries/tegra-nvpmodel_28.3.0.bb</code></td>
+        <td>NVIDIA's <code>nvpmodel</code> power/clock-mode management tool and its
+        <code>tegra186</code>-specific init/service files &mdash; pulled in via
+        <code>MACHINE_EXTRA_RDEPENDS</code> in <code>tegra186.inc</code> only; the TX1's
+        <code>tegra210.inc</code> never depends on this package.</td></tr>
+    <tr><td><code>recipes-devtools/{cuda,cudnn,cmake,visionworks,gie}</code></td>
+        <td>NVIDIA's CUDA 9.0 toolkit and related GPU-compute libraries (cuDNN, TensorRT/"gie",
+        VisionWorks) as native/target recipes &mdash; not installed by
+        <code>core-image-minimal</code>, but available if a fuller image ever pulls them in. For
+        this board, <code>CUDA_NVCC_ARCH_FLAGS</code> targets <code>compute_62</code>/<code>sm_62</code>
+        (the TX2's Pascal GPU), not the TX1's <code>compute_53</code>/<code>sm_53</code>
+        (Maxwell).</td></tr>
+    <tr><td><code>classes/image_types_tegra.bbclass</code></td>
+        <td>Defines the <code>tegraflash</code> image type this project's <code>local.conf</code>
+        opts into via <code>IMAGE_FSTYPES</code> &mdash; the class that produces the final
+        <code>doflash.sh</code> + <code>tegraflash.zip</code> flashing bundle.</td></tr>
+    <tr><td><code>classes/cuda.bbclass</code></td>
+        <td>Shared logic for locating the CUDA toolchain and setting GPU architecture flags
+        (<code>CUDA_NVCC_ARCH_FLAGS</code>), consumed by the devtools recipes above.</td></tr>
+  </table>
+
+  <h3>The machine-config include chain</h3>
+  <p><code>conf/machine/jetson-tx2.conf</code> is deliberately thin &mdash; almost everything it
+  needs is pulled in via a chain of shared <code>.inc</code> files, so the TX1, TX2, and TK1 machine
+  definitions in this same layer share as much as possible:</p>
+  <div class="diagram">
+    <div class="chain">
+      <div class="box">jetson-tx2.conf</div><span class="arrow">requires</span>
+      <div class="box">tegra186.inc</div><span class="arrow">requires</span>
+      <div class="box">tegra-common.inc</div>
+    </div>
+  </div>
+  <p><code>tegra186.inc</code> (named for the TX2's Tegra186/"Parker" SoC family) is where the
+  concrete package pins live &mdash; this checkout of <code>meta-tegra</code> only defines one
+  Tegra186-family board (the TX2 itself; no Xavier config exists in this branch's
+  <code>conf/machine/</code>), but the include is still kept separate from the machine
+  <code>.conf</code> for the same reason <code>tegra210.inc</code> is: it's the natural place a
+  second Tegra186 board would plug into later. This is the actual source of facts stated elsewhere
+  in this project:</p>
+  <div class="filecard">
+    <div class="path">sources/meta-tegra/conf/machine/include/tegra186.inc (excerpt)</div>
+<pre><code>SOC_FAMILY = "tegra186"
+KERNEL_IMAGETYPE = "Image"
+MACHINE_ESSENTIAL_EXTRA_RDEPENDS = "tegra-firmware kernel-devicetree kernel-image"
+MACHINE_EXTRA_RDEPENDS = "tegra-nvpmodel tegra-configs-nvstartup tegra-configs-udev"
+INITRAMFS_IMAGE ?= "tegra186-minimal-initramfs"
+SERIAL_CONSOLE = "115200 ttyS0"
+NVIDIA_CHIP = "0x18"
+CUDA_VERSION ?= "9.0"
+CUDA_NVCC_ARCH_FLAGS ?= "--gpu-architecture=compute_62 --gpu-code=sm_62"
+PREFERRED_PROVIDER_virtual/kernel ?= "linux-tegra"      <span style="color:var(--muted)"># from tegra-common.inc</span>
+PREFERRED_PROVIDER_u-boot ?= "u-boot-tegra"              <span style="color:var(--muted)"># from tegra-common.inc</span></code></pre>
+  </div>
+  <p>Diffing this against the TX1's <code>tegra210.inc</code> is a good way to see exactly how much
+  a Tegra machine include actually varies board-to-board: <code>SOC_FAMILY</code>,
+  <code>NVIDIA_CHIP</code>, the initramfs image name, and the CUDA architecture flags all change;
+  <code>MACHINE_EXTRA_RDEPENDS</code> gains <code>tegra-nvpmodel</code>; but
+  <code>MACHINE_ESSENTIAL_EXTRA_RDEPENDS</code>, <code>SERIAL_CONSOLE</code>, and every
+  <code>PREFERRED_PROVIDER_*</code> line are identical, because those come from the shared
+  <code>tegra-common.inc</code> both includes pull in beneath them.</p>
+  <p><code>PREFERRED_PROVIDER_virtual/kernel</code> is the mechanism that resolves "the kernel"
+  (a generic concept every image recipe depends on via <code>virtual/kernel</code>) to this specific
+  layer's <code>linux-tegra</code> recipe instead of, say, OpenEmbedded-Core's generic
+  <code>linux-yocto</code>. Same pattern for the bootloader via
+  <code>virtual/bootloader</code> &rarr; <code>u-boot-tegra</code>. This is how a BSP layer redirects
+  generic build targets toward board-specific implementations without every image recipe needing to
+  know the board exists.</p>
+
+  <h3>Reaching into another layer: <code>external/</code></h3>
+  <p>One more mechanism is worth calling out because it's easy to miss: <code>meta-tegra</code>'s
+  own <code>conf/layer.conf</code> contains logic that scans an <code>external/</code> subdirectory
+  for folders matching <em>other loaded layers' collection names</em>, and if found, adds their
+  recipes/bbappends to <code>BBFILES</code> too:</p>
+  <div class="filecard">
+    <div class="path">sources/meta-tegra/conf/layer.conf (excerpt)</div>
+<pre><code>BBFILES += "${@' '.join('${LAYERDIR}/external/%s/recipes*/*/*.bb' % layer \
+    for layer in BBFILE_COLLECTIONS.split() if os.path.exists(os.path.join('${LAYERDIR}','external',layer)))}"</code></pre>
+  </div>
+  <p>Concretely: <code>sources/meta-tegra/external/openembedded-layer/</code> exists, and
+  <code>openembedded-layer</code> is exactly <code>meta-oe</code>'s collection name from &sect;4
+  above. Inside it sits
+  <code>recipes-support/opencv/opencv_3.4.3.bbappend</code> &mdash; a Tegra-specific patch
+  (<code>0001-samples-eliminate-cvconfig.h-usage.patch</code>) applied on top of <em>meta-oe's</em>
+  OpenCV recipe. This lets <code>meta-tegra</code> carry board-specific patches for another layer's
+  package without needing write access to that layer, without a priority fight, and without that
+  bbappend being visible unless both layers are actually loaded together &mdash; exactly this
+  project's situation.</p>
+</section>
+
+<section id="priority">
+  <h2><span class="num">&sect;</span> Priority, collisions, and load order</h2>
+  <p>Restating the actual numbers for this build, since "priority" is frequently misunderstood as
+  "load order" (it isn't &mdash; <code>BBFILES</code> parsing order and priority are separate
+  concerns; priority only decides <em>collisions</em>):</p>
+  <div class="diagram">
+    <div class="stack">
+      <div class="layer tegra"><span>meta-tegra</span><span class="prio">priority 5 &mdash; collection <code>tegra</code></span></div>
+      <div class="layer"><span>meta-openembedded/meta-oe</span><span class="prio">priority 6 &mdash; collection <code>openembedded-layer</code></span></div>
+      <div class="layer"><span>poky/meta-yocto-bsp</span><span class="prio">priority 5 &mdash; collection <code>yoctobsp</code></span></div>
+      <div class="layer"><span>poky/meta-poky</span><span class="prio">priority 5 &mdash; collection <code>yocto</code></span></div>
+      <div class="layer"><span>poky/meta</span><span class="prio">priority 5 &mdash; collection <code>core</code></span></div>
+    </div>
+  </div>
+  <p>Four of the five layers sit at priority <code>5</code>; only <code>meta-oe</code> is higher, at
+  <code>6</code>. In practice this build has zero same-name/same-version recipe collisions across
+  layers &mdash; <code>bitbake-layers show-layers</code> reports all five loading cleanly, and
+  <code>meta-tegra</code> avoids ever needing to out-prioritize <code>core</code> by using
+  <code>PREFERRED_PROVIDER</code> (a targeted, explicit override) instead of a same-named recipe at
+  higher priority. Priority is the blunt, automatic tool; <code>PREFERRED_PROVIDER</code> and
+  <code>bbappend</code>s are the precise ones, and this stack relies almost entirely on the precise
+  ones.</p>
+</section>
+
+<section id="dependency">
+  <h2><span class="num">&sect;</span> The dependency graph between layers</h2>
+  <p>Collapsing every <code>LAYERDEPENDS_*</code> declaration seen above into one picture:</p>
+  <div class="diagram">
+    <div class="chain">
+      <div class="box">meta (core)</div>
+    </div>
+    <p style="margin: .6rem 0 .3rem; font-size:.85rem; color:var(--muted);">&uarr; required by all four:</p>
+    <div class="chain">
+      <div class="box">meta-poky</div>
+      <div class="box">meta-yocto-bsp</div>
+      <div class="box">meta-oe</div>
+      <div class="box">meta-tegra</div>
+    </div>
+  </div>
+  <p>It's flat, not deep: every other layer here depends directly on <code>core</code> and on
+  nothing else in this stack. <code>meta-tegra</code> does not formally depend on <code>meta-oe</code>
+  in <code>layer.conf</code> terms (no <code>LAYERDEPENDS_tegra</code> entry names it) even though,
+  as &sect;5 showed, it reaches into <code>meta-oe</code>'s OpenCV recipe via the
+  <code>external/</code> convention and expects several of its packages to be present at build time.
+  That's a soft, content-level dependency BitBake's layer system doesn't formally track &mdash;
+  which is exactly why <code>meta-oe</code> has to be listed in this project's
+  <code>bblayers.conf</code> at all, even though nothing declares it as required.</p>
+</section>
+
+<section id="trace">
+  <h2><span class="num">&sect;</span> Tracing one setting through all five layers</h2>
+  <p>To make the whole stack concrete at once, here's what actually happens, layer by layer, for a
+  single BitBake variable this project depends on: <strong><code>PREFERRED_PROVIDER_virtual/kernel</code></strong>
+  &mdash; "which recipe answers when something asks for 'the kernel'."</p>
+  <ol>
+    <li><strong><code>meta</code></strong> defines <code>virtual/kernel</code> as a concept every
+    image recipe can depend on, and ships a default generic provider
+    (<code>linux-yocto</code>) that nothing here ends up using.</li>
+    <li><strong><code>meta-poky</code></strong> and <strong><code>meta-yocto-bsp</code></strong>
+    don't touch this variable at all for this machine &mdash; they're irrelevant to the TX2's
+    kernel choice.</li>
+    <li><strong><code>meta-oe</code></strong> also doesn't touch it &mdash; it has no kernel
+    recipes of its own.</li>
+    <li><strong><code>meta-tegra</code></strong>'s <code>tegra-common.inc</code>, pulled in via
+    <code>jetson-tx2.conf</code> &rarr; <code>tegra186.inc</code>, sets
+    <code>PREFERRED_PROVIDER_virtual/kernel ?= "linux-tegra"</code> &mdash; and because this is the
+    only layer in the whole stack that sets it for this <code>MACHINE</code>, it wins by default,
+    no priority contest needed.</li>
+  </ol>
+  <p>The result: <code>bitbake core-image-minimal</code> resolves <code>virtual/kernel</code> to
+  <code>meta-tegra</code>'s <code>linux-tegra_4.4.bb</code>, which builds with the
+  <code>tegra186/defconfig</code> baked into that same layer (via <code>SOC_FAMILY = "tegra186"</code>
+  feeding into the recipe's machine-override file search path). Every other variable this project
+  cares about &mdash; the bootloader, the image type, the device tree &mdash; resolves the same way:
+  one layer, usually <code>meta-tegra</code>, is the only one with an opinion, so composition
+  reduces to "does every layer parse cleanly," which is exactly what
+  <code>bitbake -p</code> checks.</p>
+</section>
+
+<footer>
+  Written against this project's actual <code>sources/</code> checkouts &mdash; every recipe name,
+  version, and config excerpt above was read directly from the layers as checked out here, not from
+  general Yocto/meta-tegra documentation. See <a href="index.html">the project overview</a> for boot
+  chains, the build pipeline, and flashing.
+</footer>
+
+</div>
+</body>
+</html>
